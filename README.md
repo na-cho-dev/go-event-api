@@ -25,7 +25,7 @@ The API listens on http://localhost:8080 and migrates the schema on boot. Swagge
 
 ### Locally
 
-Requirements: Go 1.25+, a PostgreSQL 14+ database.
+Requirements: Go 1.26+, a PostgreSQL 14+ database.
 
 ```sh
 cp .env.example .env          # edit DATABASE_URL and JWT_SECRET
