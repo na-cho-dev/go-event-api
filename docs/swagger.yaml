@@ -1,6 +1,9 @@
+basePath: /
 definitions:
-  database.Attendee:
+  github_com_na-cho-dev_go-event-api_internal_database.Attendee:
     properties:
+      createdAt:
+        type: string
       eventId:
         type: integer
       id:
@@ -8,64 +11,195 @@ definitions:
       userId:
         type: integer
     type: object
-  database.Event:
+  github_com_na-cho-dev_go-event-api_internal_database.Event:
     properties:
+      createdAt:
+        type: string
       date:
         type: string
       description:
-        minLength: 10
         type: string
       id:
         type: integer
       location:
-        minLength: 3
         type: string
       name:
-        minLength: 3
         type: string
       ownerId:
         type: integer
+      updatedAt:
+        type: string
+    type: object
+  github_com_na-cho-dev_go-event-api_internal_database.User:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  internal_api.AuthResponse:
+    properties:
+      expiresAt:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.User'
+    type: object
+  internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_Event:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event'
+        type: array
+    type: object
+  internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_User:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.User'
+        type: array
+    type: object
+  internal_api.ErrorDetail:
+    properties:
+      code:
+        example: validation_error
+        type: string
+      details:
+        items:
+          $ref: '#/definitions/internal_api.FieldError'
+        type: array
+      message:
+        example: The request body is invalid.
+        type: string
+      requestId:
+        example: 3f1c2a9b0d4e
+        type: string
+    type: object
+  internal_api.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/internal_api.ErrorDetail'
+    type: object
+  internal_api.EventRequest:
+    properties:
+      date:
+        example: "2026-11-05T18:00:00Z"
+        type: string
+      description:
+        example: An evening of talks on APIs, queues and databases.
+        maxLength: 5000
+        minLength: 10
+        type: string
+      location:
+        example: Yaba, Lagos
+        maxLength: 200
+        minLength: 3
+        type: string
+      name:
+        example: Lagos Backend Meetup
+        maxLength: 200
+        minLength: 3
+        type: string
     required:
     - date
     - description
     - location
     - name
     type: object
-  database.User:
+  internal_api.FieldError:
     properties:
-      email:
+      field:
+        example: email
         type: string
-      id:
-        type: integer
-      name:
+      message:
+        example: must be a valid email address
         type: string
     type: object
-  main.loginRequest:
+  internal_api.HealthResponse:
+    properties:
+      database:
+        example: ok
+        type: string
+      status:
+        example: ok
+        type: string
+      uptime:
+        example: 3h12m4s
+        type: string
+      version:
+        example: 1.2.0
+        type: string
+    type: object
+  internal_api.InfoResponse:
+    properties:
+      docs:
+        example: /swagger/index.html
+        type: string
+      health:
+        example: /health
+        type: string
+      name:
+        example: go-event-api
+        type: string
+      version:
+        example: 1.2.0
+        type: string
+    type: object
+  internal_api.ListResponse-github_com_na-cho-dev_go-event-api_internal_database_Event:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event'
+        type: array
+      meta:
+        $ref: '#/definitions/internal_api.PageMeta'
+    type: object
+  internal_api.LoginRequest:
     properties:
       email:
+        example: ada@example.com
         type: string
       password:
-        minLength: 8
+        example: correct horse battery
         type: string
     required:
     - email
     - password
     type: object
-  main.loginResponse:
+  internal_api.PageMeta:
     properties:
-      token:
-        type: string
-      userId:
+      limit:
+        example: 20
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total:
+        example: 42
+        type: integer
+      totalPages:
+        example: 3
         type: integer
     type: object
-  main.registerRequest:
+  internal_api.RegisterRequest:
     properties:
       email:
+        example: ada@example.com
+        maxLength: 254
         type: string
       name:
+        example: Ada Lovelace
+        maxLength: 100
         minLength: 2
         type: string
       password:
+        example: correct horse battery
+        maxLength: 72
         minLength: 8
         type: string
     required:
@@ -74,18 +208,32 @@ definitions:
     - password
     type: object
 info:
-  contact: {}
-  description: A rest API in Go using Gin framework
-  title: Go Gin Rest API
-  version: "1.0"
+  contact:
+    name: Fortune Iheanacho
+    url: https://nachodev.me
+  description: Events and attendees with JWT authentication. Register, log in, create
+    events, and manage who attends them.
+  license:
+    name: MIT
+  title: Go Event API
+  version: "1.2"
 paths:
+  /:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api.InfoResponse'
+      summary: Service information
+      tags:
+      - System
   /api/v1/attendees/{id}/events:
     get:
-      consumes:
-      - application/json
-      description: Returns all events for a given attendee
       parameters:
-      - description: Attendee ID
+      - description: User ID
         in: path
         name: id
         required: true
@@ -96,121 +244,190 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/database.Event'
-            type: array
-      summary: Returns all events for a given attendee
+            $ref: '#/definitions/internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_Event'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      summary: Events for an attendee
       tags:
       - Attendees
   /api/v1/auth/login:
     post:
       consumes:
       - application/json
-      description: Logs in a user
       parameters:
-      - description: User
+      - description: Credentials
         in: body
-        name: user
+        name: body
         required: true
         schema:
-          $ref: '#/definitions/main.loginRequest'
+          $ref: '#/definitions/internal_api.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.loginResponse'
-      summary: Logs in a user
+            $ref: '#/definitions/internal_api.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      summary: Log in
+      tags:
+      - Auth
+  /api/v1/auth/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current user
       tags:
       - Auth
   /api/v1/auth/register:
     post:
       consumes:
       - application/json
-      description: Registers a new user
       parameters:
-      - description: User
+      - description: Account details
         in: body
-        name: user
+        name: body
         required: true
         schema:
-          $ref: '#/definitions/main.registerRequest'
+          $ref: '#/definitions/internal_api.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/database.User'
-      summary: Registers a new user
+            $ref: '#/definitions/internal_api.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      summary: Register
       tags:
       - Auth
   /api/v1/events:
     get:
-      consumes:
-      - application/json
-      description: Returns all events
+      description: Paged, ordered by date. Filter with q (name or location), owner
+        (user id) and from (RFC 3339).
+      parameters:
+      - default: 1
+        description: Page number, starting at 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size, 1 to 100
+        in: query
+        name: limit
+        type: integer
+      - description: Match name or location
+        in: query
+        name: q
+        type: string
+      - description: Only events owned by this user
+        in: query
+        name: owner
+        type: integer
+      - description: Only events on or after this RFC 3339 instant
+        in: query
+        name: from
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/database.Event'
-            type: array
-      summary: Returns all events
+            $ref: '#/definitions/internal_api.ListResponse-github_com_na-cho-dev_go-event-api_internal_database_Event'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      summary: List events
       tags:
       - Events
     post:
       consumes:
       - application/json
-      description: Creates a new event
       parameters:
       - description: Event
         in: body
-        name: event
+        name: body
         required: true
         schema:
-          $ref: '#/definitions/database.Event'
+          $ref: '#/definitions/internal_api.EventRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/database.Event'
+            $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Creates a new event
+      summary: Create an event
       tags:
       - Events
   /api/v1/events/{id}:
     delete:
-      consumes:
-      - application/json
-      description: Deletes an existing event
       parameters:
       - description: Event ID
         in: path
         name: id
         required: true
         type: integer
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Deletes an existing event
+      summary: Delete an event
       tags:
       - Events
     get:
-      consumes:
-      - application/json
-      description: Returns a single event
       parameters:
       - description: Event ID
         in: path
@@ -223,14 +440,17 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/database.Event'
-      summary: Returns a single event
+            $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      summary: Get an event
       tags:
       - Events
     put:
       consumes:
       - application/json
-      description: Updates an existing event
       parameters:
       - description: Event ID
         in: path
@@ -239,27 +459,63 @@ paths:
         type: integer
       - description: Event
         in: body
-        name: event
+        name: body
         required: true
         schema:
-          $ref: '#/definitions/database.Event'
+          $ref: '#/definitions/internal_api.EventRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/database.Event'
+            $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Updates an existing event
+      summary: Update an event
       tags:
       - Events
   /api/v1/events/{id}/attendees:
+    delete:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Leave an event
+      tags:
+      - Attendees
     get:
-      consumes:
-      - application/json
-      description: Returns all attendees for a given event
       parameters:
       - description: Event ID
         in: path
@@ -272,17 +528,47 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/database.User'
-            type: array
-      summary: Returns all attendees for a given event
+            $ref: '#/definitions/internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_User'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      summary: List attendees
+      tags:
+      - Attendees
+    post:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Attendee'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Join an event
       tags:
       - Attendees
   /api/v1/events/{id}/attendees/{userId}:
     delete:
-      consumes:
-      - application/json
-      description: Deletes an attendee from an event
       parameters:
       - description: Event ID
         in: path
@@ -294,20 +580,27 @@ paths:
         name: userId
         required: true
         type: integer
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Deletes an attendee from an event
+      summary: Remove an attendee
       tags:
       - Attendees
     post:
-      consumes:
-      - application/json
-      description: Adds an attendee to an event
       parameters:
       - description: Event ID
         in: path
@@ -325,15 +618,47 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/database.Attendee'
+            $ref: '#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Attendee'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_api.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Adds an attendee to an event
+      summary: Add an attendee
       tags:
       - Attendees
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/internal_api.HealthResponse'
+      summary: Health check
+      tags:
+      - System
 securityDefinitions:
   BearerAuth:
-    description: Enter your bearer token in the format **Bearer &lt;token&gt;**
+    description: 'Prefix the token with "Bearer ", for example: Bearer eyJhbGciOi...'
     in: header
     name: Authorization
     type: apiKey

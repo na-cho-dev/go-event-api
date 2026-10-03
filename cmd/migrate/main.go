@@ -1,54 +1,46 @@
+// Command migrate applies the embedded schema migrations.
+//
+//	migrate up      apply every pending migration
+//	migrate down    roll back every migration
+//	migrate status  print the current version
 package main
 
 import (
-	"database/sql"
-	"log"
+	"context"
+	"fmt"
 	"os"
+	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
-	"github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/joho/godotenv/autoload" // loads .env in local development
+
+	"github.com/na-cho-dev/go-event-api/internal/database"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("Please provide a migration direction: 'up' or 'down'")
+	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: migrate <up|down|status>")
+		os.Exit(2)
+	}
+	url := os.Getenv("DATABASE_URL")
+	if url == "" {
+		fmt.Fprintln(os.Stderr, "DATABASE_URL is required")
+		os.Exit(2)
 	}
 
-	directions := os.Args[1]
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	db, err := sql.Open("sqlite3", "./data.db")
+	db, err := database.Open(ctx, url)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-
 	defer db.Close()
 
-	instance, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	version, dirty, err := database.Migrate(db, os.Args[1])
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, "migrate:", err)
+		os.Exit(1)
 	}
-
-	fSrc, err := (&file.File{}).Open("cmd/migrate/migrations")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	mig, err := migrate.NewWithInstance("file", fSrc, "sqlite3", instance)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	switch directions {
-	case "up":
-		if err := mig.Up(); err != nil && err != migrate.ErrNoChange {
-			log.Fatal(err)
-		}
-	case "down":
-		if err := mig.Down(); err != nil && err != migrate.ErrNoChange {
-			log.Fatal(err)
-		}
-	default:
-		log.Fatal("Invalid direction. Use 'up' or 'down'")
-	}
+	fmt.Printf("schema version %d (dirty=%v)\n", version, dirty)
 }

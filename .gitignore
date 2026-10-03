@@ -1,1 +1,7 @@
 .env
+.env.*
+!.env.example
+tmp/
+bin/
+*.db
+coverage.out

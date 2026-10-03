@@ -1,0 +1,41 @@
+# Render Blueprint: one Docker web service plus a managed PostgreSQL database.
+# Import this file from the Render dashboard (Blueprints > New Blueprint Instance).
+#
+# Notes
+# - The free Postgres plan expires 30 days after creation; upgrade it or point
+#   DATABASE_URL at another provider (for example Neon) before then.
+# - Migrations run at boot through AUTO_MIGRATE, which works on every plan.
+#   On a paid plan you can instead set preDeployCommand: /migrate up.
+
+services:
+  - type: web
+    name: go-event-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production
+      - key: AUTO_MIGRATE
+        value: "true"
+      - key: LOG_FORMAT
+        value: json
+      - key: SWAGGER_ENABLED
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: go-event-api-db
+          property: connectionString
+
+databases:
+  - name: go-event-api-db
+    plan: free
+    region: frankfurt
+    databaseName: go_event_api
+    user: go_event_api

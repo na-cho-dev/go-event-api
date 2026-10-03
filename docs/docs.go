@@ -9,29 +9,50 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "contact": {
+            "name": "Fortune Iheanacho",
+            "url": "https://nachodev.me"
+        },
+        "license": {
+            "name": "MIT"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/attendees/{id}/events": {
+        "/": {
             "get": {
-                "description": "Returns all events for a given attendee",
-                "consumes": [
+                "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Service information",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.InfoResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/attendees/{id}/events": {
+            "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Attendees"
                 ],
-                "summary": "Returns all events for a given attendee",
+                "summary": "Events for an attendee",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Attendee ID",
+                        "description": "User ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -41,10 +62,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.Event"
-                            }
+                            "$ref": "#/definitions/internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_Event"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -52,7 +76,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/login": {
             "post": {
-                "description": "Logs in a user",
                 "consumes": [
                     "application/json"
                 ],
@@ -62,15 +85,15 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logs in a user",
+                "summary": "Log in",
                 "parameters": [
                     {
-                        "description": "User",
-                        "name": "user",
+                        "description": "Credentials",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/main.loginRequest"
+                            "$ref": "#/definitions/internal_api.LoginRequest"
                         }
                     }
                 ],
@@ -78,7 +101,49 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/main.loginResponse"
+                            "$ref": "#/definitions/internal_api.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Current user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.User"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -86,7 +151,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/register": {
             "post": {
-                "description": "Registers a new user",
                 "consumes": [
                     "application/json"
                 ],
@@ -96,15 +160,15 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Registers a new user",
+                "summary": "Register",
                 "parameters": [
                     {
-                        "description": "User",
-                        "name": "user",
+                        "description": "Account details",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/main.registerRequest"
+                            "$ref": "#/definitions/internal_api.RegisterRequest"
                         }
                     }
                 ],
@@ -112,7 +176,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/database.User"
+                            "$ref": "#/definitions/internal_api.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -120,25 +196,59 @@ const docTemplate = `{
         },
         "/api/v1/events": {
             "get": {
-                "description": "Returns all events",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Paged, ordered by date. Filter with q (name or location), owner (user id) and from (RFC 3339).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Returns all events",
+                "summary": "List events",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number, starting at 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size, 1 to 100",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Match name or location",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only events owned by this user",
+                        "name": "owner",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only events on or after this RFC 3339 instant",
+                        "name": "from",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.Event"
-                            }
+                            "$ref": "#/definitions/internal_api.ListResponse-github_com_na-cho-dev_go-event-api_internal_database_Event"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -149,7 +259,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new event",
                 "consumes": [
                     "application/json"
                 ],
@@ -159,15 +268,15 @@ const docTemplate = `{
                 "tags": [
                     "Events"
                 ],
-                "summary": "Creates a new event",
+                "summary": "Create an event",
                 "parameters": [
                     {
                         "description": "Event",
-                        "name": "event",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/database.Event"
+                            "$ref": "#/definitions/internal_api.EventRequest"
                         }
                     }
                 ],
@@ -175,7 +284,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/database.Event"
+                            "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -183,17 +304,13 @@ const docTemplate = `{
         },
         "/api/v1/events/{id}": {
             "get": {
-                "description": "Returns a single event",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Returns a single event",
+                "summary": "Get an event",
                 "parameters": [
                     {
                         "type": "integer",
@@ -207,7 +324,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/database.Event"
+                            "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -218,7 +341,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates an existing event",
                 "consumes": [
                     "application/json"
                 ],
@@ -228,7 +350,7 @@ const docTemplate = `{
                 "tags": [
                     "Events"
                 ],
-                "summary": "Updates an existing event",
+                "summary": "Update an event",
                 "parameters": [
                     {
                         "type": "integer",
@@ -239,11 +361,11 @@ const docTemplate = `{
                     },
                     {
                         "description": "Event",
-                        "name": "event",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/database.Event"
+                            "$ref": "#/definitions/internal_api.EventRequest"
                         }
                     }
                 ],
@@ -251,7 +373,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/database.Event"
+                            "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -262,17 +408,10 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes an existing event",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Events"
                 ],
-                "summary": "Deletes an existing event",
+                "summary": "Delete an event",
                 "parameters": [
                     {
                         "type": "integer",
@@ -285,23 +424,37 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
                     }
                 }
             }
         },
         "/api/v1/events/{id}/attendees": {
             "get": {
-                "description": "Returns all attendees for a given event",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Attendees"
                 ],
-                "summary": "Returns all attendees for a given event",
+                "summary": "List attendees",
                 "parameters": [
                     {
                         "type": "integer",
@@ -315,10 +468,99 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.User"
-                            }
+                            "$ref": "#/definitions/internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_User"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Attendees"
+                ],
+                "summary": "Join an event",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Event ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Attendee"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Attendees"
+                ],
+                "summary": "Leave an event",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Event ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -331,17 +573,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Adds an attendee to an event",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Attendees"
                 ],
-                "summary": "Adds an attendee to an event",
+                "summary": "Add an attendee",
                 "parameters": [
                     {
                         "type": "integer",
@@ -362,7 +600,31 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/database.Attendee"
+                            "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Attendee"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
                         }
                     }
                 }
@@ -373,17 +635,10 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes an attendee from an event",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Attendees"
                 ],
-                "summary": "Deletes an attendee from an event",
+                "summary": "Remove an attendee",
                 "parameters": [
                     {
                         "type": "integer",
@@ -403,15 +658,61 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api.HealthResponse"
+                        }
                     }
                 }
             }
         }
     },
     "definitions": {
-        "database.Attendee": {
+        "github_com_na-cho-dev_go-event-api_internal_database.Attendee": {
             "type": "object",
             "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
                 "eventId": {
                     "type": "integer"
                 },
@@ -423,7 +724,120 @@ const docTemplate = `{
                 }
             }
         },
-        "database.Event": {
+        "github_com_na-cho-dev_go-event-api_internal_database.Event": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ownerId": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_na-cho-dev_go-event-api_internal_database.User": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "expiresAt": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.User"
+                }
+            }
+        },
+        "internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_Event": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event"
+                    }
+                }
+            }
+        },
+        "internal_api.CollectionResponse-github_com_na-cho-dev_go-event-api_internal_database_User": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.User"
+                    }
+                }
+            }
+        },
+        "internal_api.ErrorDetail": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "validation_error"
+                },
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_api.FieldError"
+                    }
+                },
+                "message": {
+                    "type": "string",
+                    "example": "The request body is invalid."
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "3f1c2a9b0d4e"
+                }
+            }
+        },
+        "internal_api.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/internal_api.ErrorDetail"
+                }
+            }
+        },
+        "internal_api.EventRequest": {
             "type": "object",
             "required": [
                 "date",
@@ -433,43 +847,99 @@ const docTemplate = `{
             ],
             "properties": {
                 "date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2026-11-05T18:00:00Z"
                 },
                 "description": {
                     "type": "string",
-                    "minLength": 10
-                },
-                "id": {
-                    "type": "integer"
+                    "maxLength": 5000,
+                    "minLength": 10,
+                    "example": "An evening of talks on APIs, queues and databases."
                 },
                 "location": {
                     "type": "string",
-                    "minLength": 3
+                    "maxLength": 200,
+                    "minLength": 3,
+                    "example": "Yaba, Lagos"
                 },
                 "name": {
                     "type": "string",
-                    "minLength": 3
-                },
-                "ownerId": {
-                    "type": "integer"
+                    "maxLength": 200,
+                    "minLength": 3,
+                    "example": "Lagos Backend Meetup"
                 }
             }
         },
-        "database.User": {
+        "internal_api.FieldError": {
             "type": "object",
             "properties": {
-                "email": {
-                    "type": "string"
+                "field": {
+                    "type": "string",
+                    "example": "email"
                 },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
+                "message": {
+                    "type": "string",
+                    "example": "must be a valid email address"
                 }
             }
         },
-        "main.loginRequest": {
+        "internal_api.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "uptime": {
+                    "type": "string",
+                    "example": "3h12m4s"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.2.0"
+                }
+            }
+        },
+        "internal_api.InfoResponse": {
+            "type": "object",
+            "properties": {
+                "docs": {
+                    "type": "string",
+                    "example": "/swagger/index.html"
+                },
+                "health": {
+                    "type": "string",
+                    "example": "/health"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "go-event-api"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.2.0"
+                }
+            }
+        },
+        "internal_api.ListResponse-github_com_na-cho-dev_go-event-api_internal_database_Event": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_na-cho-dev_go-event-api_internal_database.Event"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/internal_api.PageMeta"
+                }
+            }
+        },
+        "internal_api.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -477,26 +947,37 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ada@example.com"
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 8
+                    "example": "correct horse battery"
                 }
             }
         },
-        "main.loginResponse": {
+        "internal_api.PageMeta": {
             "type": "object",
             "properties": {
-                "token": {
-                    "type": "string"
+                "limit": {
+                    "type": "integer",
+                    "example": 20
                 },
-                "userId": {
-                    "type": "integer"
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 42
+                },
+                "totalPages": {
+                    "type": "integer",
+                    "example": 3
                 }
             }
         },
-        "main.registerRequest": {
+        "internal_api.RegisterRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -505,22 +986,28 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 254,
+                    "example": "ada@example.com"
                 },
                 "name": {
                     "type": "string",
-                    "minLength": 2
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Ada Lovelace"
                 },
                 "password": {
                     "type": "string",
-                    "minLength": 8
+                    "maxLength": 72,
+                    "minLength": 8,
+                    "example": "correct horse battery"
                 }
             }
         }
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Enter your bearer token in the format **Bearer \u0026lt;token\u0026gt;**",
+            "description": "Prefix the token with \"Bearer \", for example: Bearer eyJhbGciOi...",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -530,12 +1017,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "1.2",
 	Host:             "",
-	BasePath:         "",
+	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "Go Gin Rest API",
-	Description:      "A rest API in Go using Gin framework",
+	Title:            "Go Event API",
+	Description:      "Events and attendees with JWT authentication. Register, log in, create events, and manage who attends them.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
